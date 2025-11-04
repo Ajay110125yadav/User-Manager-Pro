@@ -47,7 +47,7 @@ const registerUser = async (req, res, next) => {
 
 // Login user
 
-console.log("JWT Secret loaded in controller:", process.env.JWT_SECRET);
+
 
 const loginUser = async (req, res, next) => {
   try {
@@ -69,8 +69,7 @@ const loginUser = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    console.log("DEBUG: user._id =", user?._id);
-    console.log("DEBUG: JWT_SECRET =", process.env.JWT_SECRET)
+    
     const token = jwt.sign({ id: user._id }, "mySuperSecretKey123", {
       expiresIn: "1h",
     });
