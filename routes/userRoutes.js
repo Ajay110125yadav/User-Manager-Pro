@@ -1,12 +1,14 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, loginUser } = require("../controllers/authController");
+const { registerUser, loginUser, refreshToken, logoutUser } = require("../controllers/authController");
 const protect = require("../middleware/authMiddleware");
-const User = require("../models/userModel")
+const authorize = require("../middleware/roleMiddleware");
 
 // Public Routes
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+router.post("/refresh", refreshToken);
+router.post("/logout", logoutUser);
 
 // Protected Routes
 router.get("/profile", protect, (req, res) => {
@@ -34,11 +36,11 @@ router.get("/", protect, async (req, res) => {
     // 🔍 Search (by name or email)
     const searchQuery = req.query.search
       ? {
-          $or: [
-            { name: { $regex: req.query.search, $options: "i" } },
-            { email: { $regex: req.query.search, $options: "i" } },
-          ],
-        }
+        $or: [
+          { name: { $regex: req.query.search, $options: "i" } },
+          { email: { $regex: req.query.search, $options: "i" } },
+        ],
+      }
       : {};
 
     // 🧩 Filter (e.g., role=admin)
@@ -66,6 +68,13 @@ router.get("/", protect, async (req, res) => {
     });
   }
 });
+  
+  router.get("/admin", protect, authorize("admin"), (req, res) => {
+  res.json({
+    message: "Welcome Admin! You have full access.",
+    user: req.user,
+  });
+  });
 
 
 module.exports = router;
