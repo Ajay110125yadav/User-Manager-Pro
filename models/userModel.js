@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const { refreshToken } = require('../controllers/authController');
 
 
 const userSchema = new mongoose.Schema({
@@ -10,6 +9,21 @@ const userSchema = new mongoose.Schema({
   profilePic: {type: String, default: "https://cdn-icons-png.flaticon.com/512/149/149071.png"},
   refreshToken: {type: String, default: null},
   role: { type: String, enum: ["user", "admin"], default: "user"},
-}, { timeStamps: true });
+}, { timestamps: true }
+);
+
+// pre-save hook: hash password automatically
+
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password.password, 10);
+  next();
+});
+
+// method for comparing passwords
+
+userSchema.methods.comparePassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('User', userSchema);
