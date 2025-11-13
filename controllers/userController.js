@@ -1,111 +1,181 @@
-const User = require('../models/userModel');
+const User = require("../models/userModel");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-// GET all users.
-
-// Get All Users (Admin Only)
-exports.getAllUsersDetailed = async (req, res) => {
+// ✅ REGISTER USER
+const registerUser = async (req, res) => {
   try {
-    const users = await User.find().select("-password"); // sab users bina password ke
+    const { name, email, password, role } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ message: "Email already registered" });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ LOGIN USER
+const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ success: false, message: "Invalid email" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res
+        .status(400)
+        .json({ success: false, message: "Incorrect password" });
+
+    const token = jwt.sign({ id: user._id, role: user.role }, "secret123", {
+      expiresIn: "7d",
+    });
+
     res.status(200).json({
       success: true,
-      count: users.length,
-      users,
+      message: "Login successful",
+      token,
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
     });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
-
-// POST - create user
-
-exports.createUser = async (req, res) => {
-  const { name, email, age } = req.body;
-  if (!name || !email || !age){
-    return res.status(400).json({ success: false, message: "All field required" });
-  }
-
-  const newUser = await User.create({ name, email, age });
-  res.status(201).json({ success: true, data: newUser });
-};
-
-// PUT - update user.
-
-exports.updateUser = async (req, res) => {
-  const { id } = req.params;
-  const updated = await User.findByIdAndUpdate(id, req.body, { new: true });
-  if (!updated) return res.status(404).json({ success: false, message: "User not found" });
-  res.status(200).json({ success: true, data: updated });
-};
-
-// DELETE - remove user
-
-exports.deleteUser = async (req, res) => {
-  const { id } = req.params;
-  const deleted = await User.findByIdAndDelete(id);
-  if (!deleted) return res.status(404).json({ success: false, message: "User not found" });
-  res.status(200).json({ success: true, message: "User deleted successfully" });
-};
-
-// Get single user profile (User or Admin).
-
-exports.getUserProfile = async (req, res) => {
+// ✅ GET USER PROFILE
+const getUserProfile = async (req, res) => {
   try {
-    const userId = req.params.id || req.user.id;
-    const user = await User.findById(userId).select("-password");
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user)
+      return res.status(404).json({ success: false, message: "User not found" });
 
-    if (req.user.role !== "admin" && req.user.id == userId) {
-      return res.status(403).json({ message: "Access denied" });
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ UPDATE USER PROFILE (with Image Upload)
+const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, email, age } = req.body;
+
+    const updateData = { name, email, age };
+
+    if (req.file) {
+      updateData.profilePic = `/uploads/${req.file.filename}`;
     }
 
-    res.json({ success: true, user });
-} catch (err) {
-  res.status(500).json({ success: false, message: err.message });
-}
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select("-password");
+
+    if (!updatedUser)
+      return res.status(404).json({ success: false, message: "User not found" });
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
 };
 
-exports.getAllUsersDetailed = async (req, res) => {
+// ✅ GET ALL USERS (Admin Only)
+const getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
-    res.json({ success: true, total: users.length, users });
+    res.status(200).json({
+      success: true,
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ✅ CRUD for Admin Panel
+const createUser = async (req, res) => {
+  try {
+    const user = await User.create(req.body);
+    res.status(201).json({ success: true, user });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Analytics (Admin only).
-
-exports.getAnalytics = async (req, res) => {
+const updateUser = async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const admins = await User.countDocuments({ role: "admin"});
-    const normalUsers = await User.countDocuments({ role: "user" });
-
-    const recentUsers = await User.find().sort({ createdAt: -1 }).limit(5).select("name email role");
-
-    res.json({
-      success: true,
-      totalUsers,
-      admins,
-      normalUsers,
-      recentUsers,
-    });
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.status(200).json({ success: true, user });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
+};
 
-  // Get Logged-in User Profile.
-  exports.getMyProfile = async (req, res) => {
-    try {
-      const user = await User.findById(req.user.id).select("-password");
-      if (!user) return res.status(404).json({ success: false, message: "User not found" });
-      res.json({ success: true, user });
-    } catch (err) {
-      res.status(500).json({ success: false, message: err.message });
-    }
-  };
+const deleteUser = async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.status(200).json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const getAllUsersDetailed = async (req, res) => {
+  try {
+    const users = await User.find();
+    res.status(200).json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+const getAnalytics = async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    res.status(200).json({ success: true, totalUsers });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ✅ EXPORT EVERYTHING PROPERLY (NO DUPLICATION)
+module.exports = {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  updateUserProfile,
+  getAllUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getAllUsersDetailed,
+  getAnalytics
 };
