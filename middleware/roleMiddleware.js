@@ -1,17 +1,7 @@
-// Role-Based Uthorization Middleware.
-
-const authorize = (...allowedRoles) => {
+exports.authorize = (...roles) => {
   return (req, res, next) => {
-    if (!req.user) {
-      return res.status(401).json({ message: "User not authenticated" });
-    }
-
-    if (!allowedRoles.includes(req.user.role)){
-      return res.status(403).json({ message: "Access Denied: insufficient role" });
-    }
-
+    if (!roles.includes(req.user.role))
+      return res.status(403).json({ message: "Forbidden: insufficient rights" });
     next();
   };
 };
-
- module.exports = authorize;
