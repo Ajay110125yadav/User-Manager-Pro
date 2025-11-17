@@ -5,7 +5,9 @@ const {
   loginUser,
   refreshToken,
   logoutUser,
-  checkToken
+  checkToken,
+  forgotPassword,
+  resetPassword
 } = require("../controllers/authController");
 
 router.post("/register", registerUser);
@@ -13,5 +15,7 @@ router.post("/login", loginUser);
 router.post("/refresh", refreshToken);
 router.post("/logout", logoutUser);
 router.get("/check-token", checkToken);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password/:token", resetPassword);
 
 module.exports = router;

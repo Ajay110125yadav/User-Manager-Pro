@@ -12,6 +12,10 @@ const userSchema = new mongoose.Schema(
     },
     refreshToken: { type: String, default: null },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+
+    // ADD these two fileds for password Reset.
+    resetPasswordToken: {type: String },
+    resetPasswordExpire: {type: Date },
   },
   { timestamps: true }
 );

@@ -1,4 +1,6 @@
 const User = require("../models/userModel");
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -152,5 +154,98 @@ exports.checkToken = async (req, res) => {
     res.json({ valid: true, decoded });
   } catch (err) {
     res.status(401).json({ valid: false, message: "Invalid token" });
+  }
+};
+
+// FORGOT PASSWORD (send reset token)
+
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email required" });
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Create raw token and hased token to store in DB
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const hashed = crypto.createHash("sha256").update(resetToken).digest("hex");
+
+    user.resetPasswordToken = hashed;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${process.env.CLIENT_URL || "http://localhost:3000"}/reset-password/${resetToken}`;
+
+
+    const message = `You requested a password reset.\n\nClick the link or paste in browser within 15 minutes:\n\n${resetUrl}`;
+
+    try {
+      if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        await sendEmail({
+          to: user.email,
+          subject: "Password reset token",
+          text: message,
+        });
+      } else {
+        // fallback for local/dev: log the reset url.
+        console.log("Result URL (dev):", resetUrl);
+      }
+
+
+      return res.status(200).json({
+        success: true,
+        message: "Reset token sent to email (or logged to console in dev).",
+      });
+    } catch (err) {
+      // rollback token fields on email failure
+      user.resetPasswordToken = undefined;
+      user.resetPasswordExpire = undefined;
+      await user.save({ validateBeforeSave: false });
+      return res.status(500).json({ message: "Email could not be sent", error: err.message });
+    }
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+// Reset password (using token param).
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const token = req.params.token;
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ message: "New password is required" });
+
+    const hased = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hased,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+
+    // set new password.
+
+    user.password = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    // optionally generate new access/refresh tokens and attach.
+
+    const tokens = generateTokens(user);
+    user.refreshToken = token.refreshToken;
+
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+      ...tokens, // optionally return tokens so user is logged in after reset
+    });
+  } catch (err) {
+    return res.status(500).json({ message: "Server error", error: err.message });
   }
 };
