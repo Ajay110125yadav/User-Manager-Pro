@@ -1,10 +1,5 @@
-const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err.message);
-  res.status(500).json({
-    success: false,
-    message: 'Server Error',
-    error: err.message
-  });
+// errorHandler.js
+module.exports = (err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ success: false, message: 'Server error' });
 };
-
-module.exports = errorHandler;

@@ -1,55 +1,50 @@
 const User = require("../models/userModel");
 
-// ✅ GET USER PROFILE
-const getUserProfile = async (req, res) => {
+// USER FEATURES
+exports.getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
-    if (!user)
-      return res.status(404).json({ success: false, message: "User not found" });
+    const user = await User.findById(req.user._id).select("-password");
+    res.status(200).json({ success: true, user });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+exports.updateUserProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (req.body.name) user.name = req.body.name;
+    if (req.body.email) user.email = req.body.email;
+    if (req.file) user.profilePic = req.file.filename;
+
+    await user.save();
 
     res.status(200).json({ success: true, user });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-// ✅ UPDATE USER PROFILE
-const updateUserProfile = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const updateData = { ...req.body };
-    if (req.file) updateData.profilePic = `/uploads/${req.file.filename}`;
-
-    const updatedUser = await User.findByIdAndUpdate(userId, updateData, { new: true }).select("-password");
-    if (!updatedUser) return res.status(404).json({ success: false, message: "User not found" });
-
-    res.status(200).json({
-      success: true,
-      message: "Profile updated successfully",
-      user: updatedUser,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// ✅ ADMIN FEATURES
-const getAllUsers = async (req, res) => {
+// ADMIN FEATURES
+exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
     res.status(200).json({ success: true, users });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-const getAnalytics = async (req, res) => {
+exports.getAnalytics = async (req, res) => {
   try {
     const totalUsers = await User.countDocuments();
-    res.status(200).json({ success: true, totalUsers });
+    const admins = await User.countDocuments({ role: "admin" });
+    const normalUsers = totalUsers - admins;
+
+    res.status(200).json({ success: true, totalUsers, admins, normalUsers });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
-
-module.exports = { getUserProfile, updateUserProfile, getAllUsers, getAnalytics };
