@@ -3,9 +3,8 @@ const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
-const mongoSanitize = require("express-mongo-sanitize");
-const xss = require("xss-clean");
 const rateLimit = require("express-rate-limit");
+const sanitizeHtml = require("sanitize-html");
 
 dotenv.config();
 
@@ -17,58 +16,50 @@ const userRoutes = require("./routes/userRoutes");
 const postRoutes = require("./routes/postRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 
-// ------------------------
-// CREATE APP FIRST (IMPORTANT)
-// ------------------------
 const app = express();
 
-// ------------------------
-// SECURITY MIDDLEWARES
-// ------------------------
-app.use(helmet());          // Security headers
-app.use(mongoSanitize());   // Prevent NoSQL injection
-app.use(xss());             // Prevent XSS attacks
-app.use(cors());            // CORS enabled
-app.use(logger);            // Custom logger
+// Body parser
+app.use(express.json());
 
-// ------------------------
-// RATE LIMITER
-// ------------------------
+// Security
+app.use(helmet());
+app.use(cors());
+app.use(logger);
+
+// XSS Clean (safe alternative)
+app.use((req, res, next) => {
+  if (req.body) {
+    for (let key in req.body) {
+      if (typeof req.body[key] === "string") {
+        req.body[key] = sanitizeHtml(req.body[key]);
+      }
+    }
+  }
+  next();
+});
+
+// Rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: "Too many requests from this IP, try again in 15 minutes",
 });
 app.use(limiter);
 
-// ------------------------
-// BODY PARSER
-// ------------------------
-app.use(express.json());
-
-// ------------------------
-// ROUTES
-// ------------------------
+// Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/comments", commentRoutes);
 
-// ------------------------
-// 404 ROUTE
-// ------------------------
+// 404
 app.use((req, res) =>
   res.status(404).json({ success: false, message: "Route not found" })
 );
 
-// ------------------------
-// ERROR HANDLER
-// ------------------------
+// Error handler
 app.use(errorHandler);
 
-// ------------------------
-// MONGOOSE CONNECT
-// ------------------------
+// MongoDB
 mongoose
   .connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
