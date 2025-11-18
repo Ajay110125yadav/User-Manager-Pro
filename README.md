@@ -221,6 +221,3 @@ http://localhost:5000
 ```
 
 ---
-
-Just tell me bhai! 🙌
-
