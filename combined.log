@@ -1,0 +1,5 @@
+{"level":"error","message":"AuthMiddleware Error: jwt malformed","timestamp":"2025-11-19 01:42:19"}
+{"level":"error","message":"AuthMiddleware Error: jwt malformed","timestamp":"2025-11-19 01:43:14"}
+{"level":"error","message":"AuthMiddleware Error: jwt malformed","timestamp":"2025-11-19 01:46:46"}
+{"level":"info","message":"Post Created by User: 691c4ac8a177ad9ae2c7e855","timestamp":"2025-11-19 01:57:17"}
+{"level":"error","message":"GetAllPosts Error: Force crash test","timestamp":"2025-11-19 01:59:41"}

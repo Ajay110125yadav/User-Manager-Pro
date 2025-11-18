@@ -2,13 +2,16 @@ const express = require("express");
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const morgan = require("morgan");
+const fs = require("fs");
+const path = require("path");
+const logger = require("./utils/logger");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const sanitizeHtml = require("sanitize-html");
 
 dotenv.config();
 
-const logger = require("./middleware/logger");
 const errorHandler = require("./middleware/errorHandler");
 
 const authRoutes = require("./routes/authRoutes");
@@ -21,10 +24,18 @@ const app = express();
 // Body parser
 app.use(express.json());
 
+// Morgan Access log setup
+const accessLogStream = fs.createWriteStream(
+  path.join(__dirname, "access.log"),
+  { flags: "a" }
+);
+
+// Log every request to access.log
+app.use(morgan("combined", { stream: accessLogStream }));
+
 // Security
 app.use(helmet());
 app.use(cors());
-app.use(logger);
 
 // XSS Clean (safe alternative)
 app.use((req, res, next) => {

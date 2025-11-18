@@ -1,5 +1,6 @@
 const Post = require("../models/Post");
-const redis = require("../utils/redis"); // Redis client
+const redis = require("../utils/redis");
+const logger = require("../utils/logger");
 
 // ---------------------------
 // CREATE POST
@@ -15,12 +16,15 @@ exports.createPost = async (req, res) => {
             author: req.user._id
         });
 
-        // Clear cache after create
+        // Clear cache
         await redis.del("all_posts");
+
+        // SUCCESS LOG
+        logger.info(`Post Created by User: ${req.user._id}`);
 
         res.status(201).json({ success: true, post });
     } catch (err) {
-        console.error(err);
+        logger.error(`CreatePost Error: ${err.message}`);
         res.status(500).json({ success: false, message: "Server error" });
     }
 };
@@ -30,9 +34,9 @@ exports.createPost = async (req, res) => {
 // ---------------------------
 exports.getAllPosts = async (req, res) => {
     try {
-        // Check cache first
         const cachedPosts = await redis.get("all_posts");
         if (cachedPosts) {
+            logger.info("Returned posts from cache");
             return res.status(200).json({
                 success: true,
                 fromCache: true,
@@ -41,7 +45,6 @@ exports.getAllPosts = async (req, res) => {
             });
         }
 
-        // If no cache, fetch from DB
         const posts = await Post.find()
             .populate("author", "name email")
             .populate({
@@ -50,13 +53,14 @@ exports.getAllPosts = async (req, res) => {
             })
             .sort({ createdAt: -1 });
 
-        // Store in Redis cache for 10 minutes
         await redis.set("all_posts", JSON.stringify(posts), "EX", 600);
+
+        logger.info("Returned posts from database");
 
         res.status(200).json({ success: true, fromCache: false, count: posts.length, posts });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: "Server error" });
+        logger.error(`GetAllPosts Error: ${err.message}`);
+        res.status(500).json({ message: "Server error" });
     }
 };
 
@@ -73,11 +77,13 @@ exports.updatePost = async (req, res) => {
 
     await post.save();
 
-    // Clear cache after update
     await redis.del("all_posts");
+
+    logger.info(`Post Updated: ${req.params.id}`);
 
     res.status(200).json({ success: true, post });
   } catch (error) {
+    logger.error(`UpdatePost Error: ${error.message}`);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
@@ -90,11 +96,13 @@ exports.deletePost = async (req, res) => {
     const post = await Post.findByIdAndDelete(req.params.id);
     if (!post) return res.status(404).json({ success: false, message: "Post not found" });
 
-    // Clear cache after delete
     await redis.del("all_posts");
+
+    logger.info(`Post Deleted: ${req.params.id}`);
 
     res.status(200).json({ success: true, message: "Post deleted" });
   } catch (err) {
+    logger.error(`DeletePost Error: ${err.message}`);
     res.status(500).json({ success: false, message: "Server error" });
   }
 };
