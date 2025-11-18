@@ -5,8 +5,9 @@ const cors = require("cors");
 const morgan = require("morgan");
 const fs = require("fs");
 const path = require("path");
-const logger = require("./utils/logger");
 const helmet = require("helmet");
+const logger = require("./utils/logger");
+const config = require("./config/config");
 const rateLimit = require("express-rate-limit");
 const sanitizeHtml = require("sanitize-html");
 
@@ -71,12 +72,10 @@ app.use((req, res) =>
 app.use(errorHandler);
 
 // MongoDB
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch((err) => console.error("MongoDB Error:", err));
+require("./config/db")(config.mongoURI);
 
-const PORT = process.env.PORT || 5000;
+const PORT = config.port;
+
 app.listen(PORT, () =>
   console.log(`Server running on port ${PORT}`)
 );
